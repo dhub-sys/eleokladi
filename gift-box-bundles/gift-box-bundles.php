@@ -473,7 +473,9 @@ final class GGB_Gift_Box {
         $added = [];
         foreach ($data['ggb_contents'] as $row) {
             $p = wc_get_product($row['id']);
-            $child = ['ggb_parent' => $key, 'ggb_per_box' => $row['qty'], 'ggb_label' => $row['label']];
+            // The slot index keeps the same product chosen in two slots (e.g. the same olive
+            // jar as 2nd and 3rd product) on two lines; WooCommerce would merge them otherwise.
+            $child = ['ggb_parent' => $key, 'ggb_slot' => $row['slot'], 'ggb_per_box' => $row['qty'], 'ggb_label' => $row['label']];
             $child_key = false;
             if ($p) {
                 $child_key = $p->is_type('variation')
