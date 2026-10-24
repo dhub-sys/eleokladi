@@ -3,26 +3,29 @@
  * the first paint (gift-box.js does the same for browsers without :has). */
 body:has(form.ggb-form) form.cart:not(.ggb-form):has(.ggb-box) { display: none; }
 .ggb-form, .ggb-box { display: block; width: 100%; flex: 1 0 100%; box-sizing: border-box; }
-.ggb-box { margin: 0 0 1.5em; }
-.ggb-slot { border: 0; margin: 0 0 1.75em; padding: 0; min-width: 0; }
-.ggb-slot legend { font-weight: 600; padding: 0; margin: 0 0 .6em; border: 0; }
+.ggb-box { margin: 0 0 1.5em; --ggb-photo: 96px; --ggb-gap: 30px; }
+/* Same space from photo to photo, within a slot and between slots. */
+.ggb-slot { margin: 0 0 var(--ggb-gap); padding: 0; border: 0; min-width: 0; }
+.ggb-options { display: grid; gap: var(--ggb-gap); }
+.ggb-choice, .ggb-option { display: flex; align-items: center; gap: 1em; margin: 0; }
+/* Title above the dropdown / product name, to the right of the photo. */
+.ggb-field { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: .4em; }
+.ggb-slot-title { display: block; font-weight: 600; line-height: 1.3; }
 .ggb-hint { font-weight: 400; opacity: .7; font-size: .9em; }
-.ggb-options { display: grid; gap: .9em; }
-/* Dropdowns */
-.ggb-choice { display: flex; align-items: center; gap: 1em; }
-.ggb-thumb { flex: none; width: 72px; height: 72px; border: 0; border-radius: 6px; overflow: hidden; line-height: 0; }
-.ggb-choice select { flex: 1 1 auto; min-width: 0; width: 100%; max-width: 100%; }
+.ggb-thumb { flex: none; width: var(--ggb-photo); height: var(--ggb-photo); border: 0; border-radius: 6px; overflow: hidden; line-height: 0; }
+/* The theme may give images a border, shadow or margin: keep the photo clean. */
+.ggb-box .ggb-thumb img { width: var(--ggb-photo); height: var(--ggb-photo); max-width: none; object-fit: cover; border: 0; box-shadow: none; margin: 0; padding: 0; border-radius: 6px; display: block; }
+.ggb-choice select { width: 100%; max-width: 100%; min-width: 0; }
 .ggb-choice select:not(.uk-select) { min-height: 44px; padding: .4em .6em; font: inherit; border: 1px solid rgba(0, 0, 0, .2); border-radius: 4px; background-color: #fff; }
 /* Included / optional single products */
-.ggb-option { display: flex; align-items: center; gap: 1em; margin: 0; }
+.ggb-line { display: flex; align-items: center; gap: .6em; }
+.ggb-name { flex: 1 1 auto; }
+.ggb-price { margin-left: .4em; }
+.ggb-price { white-space: nowrap; font-size: .95em; }
+.ggb-out { font-size: .85em; color: #a00; }
 label.ggb-option { cursor: pointer; }
 .ggb-option.is-out { opacity: .5; cursor: not-allowed; }
 .ggb-option input[type="checkbox"] { margin: 0; flex: none; }
-/* The theme may give images a border, shadow or margin: keep the photo clean. */
-.ggb-box .ggb-thumb img { width: 72px; height: 72px; max-width: none; object-fit: cover; border: 0; box-shadow: none; margin: 0; padding: 0; border-radius: 6px; display: block; }
-.ggb-name { flex: 1 1 auto; }
-.ggb-price { white-space: nowrap; font-size: .95em; }
-.ggb-out { font-size: .85em; color: #a00; }
 .ggb-summary { border-top: 1px solid rgba(0, 0, 0, .1); padding-top: .75em; }
 .ggb-summary p { margin: 0 0 .3em; }
 .ggb-total-line { font-size: 1.15em; }
@@ -30,7 +33,7 @@ label.ggb-option { cursor: pointer; }
 .ggb-errors p { margin: 0 0 .25em; }
 .ggb-form .quantity { display: inline-block; margin-right: .5em; }
 @media (max-width: 480px) {
-  .ggb-thumb, .ggb-box .ggb-thumb img { width: 56px; height: 56px; }
+  .ggb-box { --ggb-photo: 72px; --ggb-gap: 22px; }
 }
 /* Cart: the box's products under the box */
 .woocommerce-cart-form .ggb-child td.product-name { padding-left: 2em; }
