@@ -4,6 +4,20 @@ jQuery(function ($) {
   'use strict';
   const data = window.GGBData || {};
   const i18n = data.i18n || {};
+  const sprintf = (text, ...args) => args.reduce((t, a, i) => t.replace('%' + (i + 1) + '$s', a).replace('%' + (i + 1) + '$d', a).replace(/%[sd]/, a), String(text || ''));
+
+  function formatAmount(amount) {
+    const f = data.format || {};
+    const decimals = Number.isInteger(f.decimals) ? f.decimals : 2;
+    const parts = Math.abs(amount).toFixed(decimals).split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, f.thousandSep === undefined ? ' ' : f.thousandSep);
+    const number = parts.join(f.decimalSep === undefined ? ',' : f.decimalSep);
+    return (f.pattern || '%2$s %1$s').replace('%1$s', f.symbol || '€').replace('%2$s', number);
+  }
+  function priceHtml(amount) {
+    return '<span class="woocommerce-Price-amount amount"><bdi>' + $('<div>').text(formatAmount(amount)).html() + '</bdi></span>';
+  }
+
   $('.ggb-box').each(function () { setup($(this)); });
 
   function setup($box) {
@@ -13,40 +27,29 @@ jQuery(function ($) {
     const fee = Number($box.data('fee')) || 0;
     let tried = false;
 
-    const sprintf = (text, ...args) => args.reduce((t, a, i) => t.replace('%' + (i + 1) + '$s', a).replace('%' + (i + 1) + '$d', a).replace(/%[sd]/, a), String(text || ''));
-
-    function formatAmount(amount) {
-      const f = data.format || {};
-      const decimals = Number.isInteger(f.decimals) ? f.decimals : 2;
-      const parts = Math.abs(amount).toFixed(decimals).split('.');
-      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, f.thousandSep === undefined ? ' ' : f.thousandSep);
-      const number = parts.join(f.decimalSep === undefined ? ',' : f.decimalSep);
-      return (f.pattern || '%2$s %1$s').replace('%1$s', f.symbol || '€').replace('%2$s', number);
-    }
-    function priceHtml(amount) {
-      return '<span class="woocommerce-Price-amount amount"><bdi>' + $('<div>').text(formatAmount(amount)).html() + '</bdi></span>';
-    }
-
-    /** Chosen inputs of a slot with their quantity: [{input, qty, price}]. */
+    /** Chosen products of a slot: [{qty, price}]. */
     function picks($slot) {
       const list = [];
-      $slot.find('input').each(function () {
-        const $i = $(this);
-        let qty = 0;
-        if ($i.is('.ggb-qty, .ggb-fixed')) qty = Math.max(0, parseInt($i.val(), 10) || 0);
-        else if ($i.is(':checked') && $i.val() !== '') qty = 1;
-        if (qty) list.push({input: this, qty: qty, price: Number($i.data('price')) || 0});
+      $slot.find('input.ggb-fixed').each(function () {
+        list.push({qty: Math.max(0, parseInt(this.value, 10) || 0), price: Number($(this).data('price')) || 0});
+      });
+      $slot.find('input:checkbox:checked').each(function () {
+        list.push({qty: 1, price: Number($(this).data('price')) || 0});
+      });
+      $slot.find('select.ggb-select').each(function () {
+        const $o = $(this).find('option:selected');
+        if (this.value) list.push({qty: 1, price: Number($o.data('price')) || 0});
       });
       return list;
     }
-    const sum = (list, key) => list.reduce((t, p) => t + (key ? p[key] * p.qty : p.qty), 0);
 
     function state() {
       const slots = $box.find('.ggb-slot').map(function () {
         const $slot = $(this);
         const list = picks($slot);
         return {$slot: $slot, min: Number($slot.data('min')) || 0, max: Number($slot.data('max')) || 0,
-          label: $slot.data('label'), count: sum(list), price: sum(list, 'price')};
+          repeat: String($slot.data('repeat')) === '1', label: $slot.data('label'),
+          count: list.reduce((t, p) => t + p.qty, 0), price: list.reduce((t, p) => t + p.qty * p.price, 0)};
       }).get();
       return {slots: slots, count: slots.reduce((t, s) => t + s.count, 0), price: slots.reduce((t, s) => t + s.price, 0)};
     }
@@ -62,24 +65,24 @@ jQuery(function ($) {
       return list;
     }
 
-    /** Stops the customer going over a slot's or the box's maximum. */
+    /** Keeps the box's maximum and, where a product may be taken once, hides it in the other dropdowns. */
     function limit(st) {
-      const boxLeft = boxMax ? boxMax - st.count : Infinity;
+      const boxFull = boxMax && st.count >= boxMax;
       st.slots.forEach(s => {
-        const left = Math.min(s.max - s.count, boxLeft);
-        s.$slot.find('input').each(function () {
-          const $i = $(this);
-          if ($i.closest('.ggb-option').hasClass('is-out') || $i.is('.ggb-fixed')) return;
-          if ($i.is('.ggb-qty')) {
-            const value = parseInt($i.val(), 10) || 0;
-            $i.attr('max', Math.max(value, value + left));
-          } else if ($i.is(':checkbox')) {
-            $i.prop('disabled', !$i.is(':checked') && left <= 0);
-          } else if ($i.val() !== '') {
-            // Radio: switching keeps the count; only coming from "Aucun" adds one.
-            const fromNone = s.count === 0;
-            $i.prop('disabled', fromNone && left <= 0);
-          }
+        const $selects = s.$slot.find('select.ggb-select');
+        $selects.each(function () {
+          const select = this;
+          const taken = s.repeat ? [] : $selects.not(select).map(function () { return this.value; }).get().filter(Boolean);
+          $(select).find('option').each(function () {
+            if (!this.value) return;
+            const out = String($(this).data('out')) === '1';
+            // An empty dropdown cannot add a product to a full box; a filled one can still be changed.
+            this.disabled = out || taken.includes(this.value) || (boxFull && !select.value);
+          });
+        });
+        s.$slot.find('input:checkbox').each(function () {
+          if ($(this).closest('.ggb-option').hasClass('is-out')) return;
+          this.disabled = !this.checked && boxFull;
         });
       });
     }
@@ -90,9 +93,13 @@ jQuery(function ($) {
       $box.find('.ggb-count').text(st.count);
       $box.find('.ggb-total').html(priceHtml(fee + st.price));
       $box.find('.ggb-option').each(function () {
-        const $o = $(this);
-        const $i = $o.find('input').first();
-        $o.toggleClass('is-chosen', $i.is('.ggb-qty, .ggb-fixed') ? (parseInt($i.val(), 10) || 0) > 0 : $i.is(':checked') && $i.val() !== '');
+        const $i = $(this).find('input').first();
+        $(this).toggleClass('is-chosen', $i.is('.ggb-fixed') || $i.is(':checked'));
+      });
+      $box.find('.ggb-choice').each(function () {
+        const $o = $(this).find('option:selected');
+        const img = $(this).find('select').val() ? $o.data('img') : '';
+        $(this).toggleClass('is-chosen', !!img).find('.ggb-thumb').html(img ? $('<img alt="">').attr('src', img) : '');
       });
       if (tried) showProblems(problems(st));
       return st;
@@ -104,15 +111,7 @@ jQuery(function ($) {
       list.forEach(text => $('<p>').text(text).appendTo($errors));
     }
 
-    $box.on('change input', 'input', function () {
-      const $i = $(this);
-      if ($i.is('.ggb-qty')) {
-        const max = Number($i.attr('max')) || 0;
-        const value = Math.max(0, parseInt($i.val(), 10) || 0);
-        if (value > max) $i.val(max);
-      }
-      update();
-    });
+    $box.on('change', 'input, select', update);
 
     $form.on('submit', function (e) {
       tried = true;

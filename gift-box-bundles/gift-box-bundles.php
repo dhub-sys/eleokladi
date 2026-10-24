@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Gift Box Bundles
  * Description: Συσκευασίες δώρου (κουτιά) με θέσεις προϊόντων: σταθερά προϊόντα, επιλογή από λίστα, ελάχιστο/μέγιστο πλήθος. Το κουτί χρεώνεται με τη δική του τιμή και κάθε προϊόν μπαίνει στο καλάθι ως δική του γραμμή (απόθεμα, ΦΠΑ).
- * Version: 1.0.2
+ * Version: 1.1.0
  * Requires Plugins: woocommerce
  * Requires PHP: 7.4
  * Author: Custom
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) exit;
  * cannot be removed or changed on their own, and are removed with the box.
  */
 final class GGB_Gift_Box {
-    const VERSION = '1.0.2';
+    const VERSION = '1.1.0';
     const ENABLED_KEY = '_ggb_enabled';
     const SLOTS_KEY = '_ggb_slots';
     const MIN_KEY = '_ggb_min_items';
@@ -125,13 +125,13 @@ final class GGB_Gift_Box {
         }
         return $product->is_purchasable() ? $product : null;
     }
-    /** How a slot is shown: fixed (no choice), radio, check (tick boxes) or qty (number fields). */
+    /**
+     * How a slot is shown: fixed (one product, no choice), check (one optional product,
+     * ticked) or select (one dropdown per product the slot holds, e.g. 2 dropdowns for "2 of 3").
+     */
     private static function slot_mode($slot) {
-        $single = count($slot['products']) === 1;
-        if ($single && $slot['min'] === $slot['max'] && $slot['min'] >= 1 && ($slot['min'] === 1 || $slot['repeat'])) return 'fixed';
-        if ($slot['repeat'] && $slot['max'] > 1) return 'qty';
-        if ($slot['max'] === 1 && !$single) return 'radio';
-        return 'check';
+        if (count($slot['products']) > 1 || ($slot['repeat'] && $slot['min'] < $slot['max'])) return 'select';
+        return $slot['min'] >= 1 && $slot['min'] === $slot['max'] ? 'fixed' : 'check';
     }
 
     /* ------------------------------------------------------------------
@@ -190,7 +190,7 @@ final class GGB_Gift_Box {
         echo '<h4 style="padding:0 12px">Θέσεις του κουτιού</h4>';
         echo '<p class="description" style="padding:0 12px">Κάθε θέση: τα προϊόντα που προτείνετε και πόσα από αυτά παίρνει ο πελάτης. '
             . 'Ένα προϊόν με ελάχιστο = μέγιστο = 1 εμφανίζεται ως «περιλαμβάνεται» (χωρίς επιλογή). Ένα προϊόν με ελάχιστο 0 εμφανίζεται ως τσεκαρισμένο κουτάκι που ο πελάτης μπορεί να βγάλει. '
-            . 'Το «ίδιο προϊόν πολλές φορές» δίνει πεδία ποσότητας (π.χ. 2 ίδια βάζα ελιές).</p>';
+            . 'Όπου υπάρχει επιλογή, ο πελάτης βλέπει ένα dropdown για κάθε προϊόν της θέσης (π.χ. «από 0 έως 2» = 2 dropdown). Το «ίδιο προϊόν πολλές φορές» επιτρέπει να διαλέξει το ίδιο προϊόν σε περισσότερα από ένα dropdown.</p>';
         echo '<div class="ggb-slots">';
         foreach ($slots as $i => $slot) echo self::slot_admin_html($i, $slot, $product); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
         echo '</div>';
@@ -376,32 +376,44 @@ final class GGB_Gift_Box {
         $mode = self::slot_mode($slot);
         $label = $slot['label'] !== '' ? $slot['label'] : sprintf(__('Produit %d', 'gift-box-bundles'), $s + 1);
         if ($mode === 'fixed') $hint = __('inclus', 'gift-box-bundles');
-        elseif ($slot['min'] === $slot['max']) $hint = sprintf(__('choisissez %d', 'gift-box-bundles'), $slot['max']);
+        elseif ($slot['min'] === $slot['max']) $hint = $slot['max'] === 1 ? '' : sprintf(__('choisissez %d', 'gift-box-bundles'), $slot['max']);
         elseif ($slot['min'] === 0) $hint = $slot['max'] === 1 ? __('facultatif', 'gift-box-bundles') : sprintf(__('jusqu\'à %d, facultatif', 'gift-box-bundles'), $slot['max']);
         else $hint = sprintf(__('de %1$d à %2$d', 'gift-box-bundles'), $slot['min'], $slot['max']);
-        printf('<fieldset class="ggb-slot ggb-mode-%s" data-min="%d" data-max="%d" data-label="%s">', esc_attr($mode), $slot['min'], $slot['max'], esc_attr($label));
-        echo '<legend>' . esc_html($label) . ' <span class="ggb-hint">(' . esc_html($hint) . ')</span></legend><div class="ggb-options">';
-        if ($mode === 'radio' && $slot['min'] === 0) {
-            echo '<label class="ggb-option ggb-none"><input type="radio" name="ggb[' . (int) $s . '][]" value="" data-price="0" checked> <span class="ggb-name">' . esc_html__('Aucun', 'gift-box-bundles') . '</span></label>';
-        }
-        $single = count($slot['products']) === 1;
+        printf('<fieldset class="ggb-slot ggb-mode-%s" data-min="%d" data-max="%d" data-label="%s" data-repeat="%d">', esc_attr($mode), $slot['min'], $slot['max'], esc_attr($label), $slot['repeat'] ? 1 : 0);
+        echo '<legend>' . esc_html($label) . ($hint !== '' ? ' <span class="ggb-hint">(' . esc_html($hint) . ')</span>' : '') . '</legend><div class="ggb-options">';
+        $products = [];
         foreach ($slot['products'] as $id) {
             $p = self::option_product($id);
-            if (!$p) continue;
+            if ($p) $products[$id] = $p;
+        }
+        if ($mode === 'select') {
+            $options = '';
+            foreach ($products as $id => $p) {
+                $price = (float) wc_get_price_to_display($p);
+                $in_stock = $p->is_in_stock();
+                $image = $p->get_image_id() ? wp_get_attachment_image_url($p->get_image_id(), 'woocommerce_gallery_thumbnail') : wc_placeholder_img_src('woocommerce_gallery_thumbnail');
+                $text = $p->get_name() . ' — ' . html_entity_decode(wp_strip_all_tags(wc_price($price)), ENT_QUOTES, 'UTF-8') . ($in_stock ? '' : ' (' . __('Épuisé', 'gift-box-bundles') . ')');
+                $options .= '<option value="' . (int) $id . '" data-price="' . esc_attr($price) . '" data-img="' . esc_url($image) . '"' . ($in_stock ? '' : ' data-out="1" disabled') . '>' . esc_html($text) . '</option>';
+            }
+            for ($k = 0; $k < $slot['max']; $k++) {
+                $placeholder = $k < $slot['min'] ? __('— Choisissez un produit —', 'gift-box-bundles') : __('— Aucun (facultatif) —', 'gift-box-bundles');
+                $aria = $slot['max'] > 1 ? $label . ' ' . ($k + 1) : $label;
+                echo '<div class="ggb-choice"><span class="ggb-thumb" aria-hidden="true"></span>';
+                echo '<select class="ggb-select uk-select" name="ggb[' . (int) $s . '][]" aria-label="' . esc_attr($aria) . '"><option value="" data-price="0">' . esc_html($placeholder) . '</option>' . $options . '</select></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+            }
+            echo '</div></fieldset>';
+            return;
+        }
+        foreach ($products as $id => $p) {
             $in_stock = $p->is_in_stock();
             $price = (float) wc_get_price_to_display($p);
-            $attrs = 'data-price="' . esc_attr($price) . '"' . ($in_stock ? '' : ' disabled');
             if ($mode === 'fixed') {
                 $input = '<input type="hidden" name="ggb_qty[' . (int) $s . '][' . (int) $id . ']" value="' . (int) $slot['min'] . '" data-price="' . esc_attr($price) . '" class="ggb-fixed">';
-            } elseif ($mode === 'qty') {
-                $input = '<input type="number" class="ggb-qty" min="0" max="' . (int) $slot['max'] . '" step="1" value="0" name="ggb_qty[' . (int) $s . '][' . (int) $id . ']" ' . $attrs . ' aria-label="' . esc_attr(sprintf(__('Quantité de %s', 'gift-box-bundles'), $p->get_name())) . '">';
             } else {
-                $type = $mode === 'radio' ? 'radio' : 'checkbox';
                 // A lone optional product is in the box unless the customer takes it out.
-                $checked = $single && $in_stock ? ' checked' : '';
-                $input = '<input type="' . $type . '" name="ggb[' . (int) $s . '][]" value="' . (int) $id . '" ' . $attrs . $checked . '>';
+                $input = '<input type="checkbox" class="uk-checkbox" name="ggb[' . (int) $s . '][]" value="' . (int) $id . '" data-price="' . esc_attr($price) . '"' . ($in_stock ? ' checked' : ' disabled') . '>';
             }
-            $tag = $mode === 'qty' || $mode === 'fixed' ? 'div' : 'label';
+            $tag = $mode === 'fixed' ? 'div' : 'label';
             echo '<' . $tag . ' class="ggb-option' . ($in_stock ? '' : ' is-out') . '">'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
             echo $input; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
             echo '<span class="ggb-thumb">' . $p->get_image('woocommerce_gallery_thumbnail') . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
