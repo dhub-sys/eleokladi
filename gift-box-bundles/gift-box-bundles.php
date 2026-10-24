@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Gift Box Bundles
  * Description: Συσκευασίες δώρου (κουτιά) με θέσεις προϊόντων: σταθερά προϊόντα, επιλογή από λίστα, ελάχιστο/μέγιστο πλήθος. Το κουτί χρεώνεται με τη δική του τιμή και κάθε προϊόν μπαίνει στο καλάθι ως δική του γραμμή (απόθεμα, ΦΠΑ).
- * Version: 1.0.1
+ * Version: 1.0.2
  * Requires Plugins: woocommerce
  * Requires PHP: 7.4
  * Author: Custom
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) exit;
  * cannot be removed or changed on their own, and are removed with the box.
  */
 final class GGB_Gift_Box {
-    const VERSION = '1.0.1';
+    const VERSION = '1.0.2';
     const ENABLED_KEY = '_ggb_enabled';
     const SLOTS_KEY = '_ggb_slots';
     const MIN_KEY = '_ggb_min_items';
@@ -280,12 +280,13 @@ final class GGB_Gift_Box {
     }
     public static function render() {
         global $product;
-        if (self::is_box($product)) self::render_box($product);
+        static $done = [];
+        // A theme calling the hook twice in the same form would post every choice twice.
+        if (!self::is_box($product) || isset($done[$product->get_id()])) return;
+        $done[$product->get_id()] = true;
+        self::render_box($product);
     }
     private static function render_box($product) {
-        // One box per product and page: a theme that calls the hook twice or the shortcode
-        // next to the normal form would otherwise post every choice twice.
-        if (isset(self::$rendered[$product->get_id()])) return;
         self::$rendered[$product->get_id()] = true;
         self::enqueue();
         $config = self::config($product);
@@ -313,10 +314,19 @@ final class GGB_Gift_Box {
      */
     public static function shortcode($atts) {
         $atts = shortcode_atts(['id' => 0], $atts, 'gift_box');
-        $id = absint($atts['id']) ?: (is_product() ? get_queried_object_id() : 0);
+        $id = absint($atts['id']);
+        if (!$id && is_product()) $id = get_queried_object_id();
+        if (!$id && isset($GLOBALS['product']) && $GLOBALS['product'] instanceof WC_Product) $id = $GLOBALS['product']->get_id();
+        if (!$id) $id = (int) get_the_ID();
         $product = $id ? wc_get_product($id) : null;
-        if (!self::is_box($product) || isset(self::$rendered[$product->get_id()])) return '';
-        if (!$product->is_purchasable() || !$product->is_in_stock()) return '';
+        // The shortcode always prints its own form: SEO plugins and page builders often run
+        // the content once before the real output, so "already shown" cannot be trusted here.
+        $problems = $product ? self::problems($product) : ['Δεν βρέθηκε ποιο προϊόν είναι το κουτί. Γράψτε [gift_box id="ID του κουτιού"].'];
+        if ($problems) {
+            if (!current_user_can('manage_woocommerce')) return '';
+            return '<div class="ggb-diagnostics" style="border:2px dashed #b32d2e;padding:10px 14px;background:#fff;color:#1d2327"><strong>[gift_box] — δεν εμφανίζεται στον πελάτη</strong> <small>(το βλέπουν μόνο οι διαχειριστές)</small><ul style="margin:6px 0 0 18px"><li>'
+                . implode('</li><li>', array_map('esc_html', $problems)) . '</li></ul></div>';
+        }
         ob_start();
         echo '<form class="cart ggb-form" action="' . esc_url($product->get_permalink()) . '" method="post" enctype="multipart/form-data">';
         self::render_box($product);
