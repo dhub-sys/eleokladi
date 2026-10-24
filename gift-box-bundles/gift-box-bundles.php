@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Gift Box Bundles
  * Description: Συσκευασίες δώρου (κουτιά) με θέσεις προϊόντων: σταθερά προϊόντα, επιλογή από λίστα, ελάχιστο/μέγιστο πλήθος. Το κουτί χρεώνεται με τη δική του τιμή και κάθε προϊόν μπαίνει στο καλάθι ως δική του γραμμή (απόθεμα, ΦΠΑ).
- * Version: 1.3.0
+ * Version: 1.3.1
  * Requires Plugins: woocommerce
  * Requires PHP: 7.4
  * Author: Custom
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) exit;
  * cannot be removed or changed on their own, and are removed with the box.
  */
 final class GGB_Gift_Box {
-    const VERSION = '1.3.0';
+    const VERSION = '1.3.1';
     const ENABLED_KEY = '_ggb_enabled';
     const SLOTS_KEY = '_ggb_slots';
     const MIN_KEY = '_ggb_min_items';
@@ -398,6 +398,8 @@ final class GGB_Gift_Box {
         $mode = self::slot_mode($slot);
         $label = $slot['label'] !== '' ? $slot['label'] : sprintf(__('Produit %d', 'gift-box-bundles'), $s + 1);
         if ($mode === 'fixed') $hint = __('inclus', 'gift-box-bundles');
+        // A lone optional product comes ticked: say it can be taken out.
+        elseif ($mode === 'check') $hint = __('inclus — décochez pour le retirer', 'gift-box-bundles');
         elseif ($slot['min'] === $slot['max']) $hint = $slot['max'] === 1 ? '' : sprintf(__('choisissez %d', 'gift-box-bundles'), $slot['max']);
         elseif ($slot['min'] === 0) $hint = $slot['max'] === 1 ? __('facultatif', 'gift-box-bundles') : sprintf(__('jusqu\'à %d, facultatif', 'gift-box-bundles'), $slot['max']);
         else $hint = sprintf(__('de %1$d à %2$d', 'gift-box-bundles'), $slot['min'], $slot['max']);
