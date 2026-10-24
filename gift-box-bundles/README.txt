@@ -1,4 +1,4 @@
-GIFT BOX BUNDLES 1.2.1 — Συσκευασίες δώρου για WooCommerce
+GIFT BOX BUNDLES 1.2.2 — Συσκευασίες δώρου για WooCommerce
 
 ΕΓΚΑΤΑΣΤΑΣΗ
 1. Plugins > Add New > Upload Plugin > το ZIP του φακέλου gift-box-bundles > Activate.

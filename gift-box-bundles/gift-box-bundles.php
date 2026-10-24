@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Gift Box Bundles
  * Description: Συσκευασίες δώρου (κουτιά) με θέσεις προϊόντων: σταθερά προϊόντα, επιλογή από λίστα, ελάχιστο/μέγιστο πλήθος. Το κουτί χρεώνεται με τη δική του τιμή και κάθε προϊόν μπαίνει στο καλάθι ως δική του γραμμή (απόθεμα, ΦΠΑ).
- * Version: 1.2.1
+ * Version: 1.2.2
  * Requires Plugins: woocommerce
  * Requires PHP: 7.4
  * Author: Custom
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) exit;
  * cannot be removed or changed on their own, and are removed with the box.
  */
 final class GGB_Gift_Box {
-    const VERSION = '1.2.1';
+    const VERSION = '1.2.2';
     const ENABLED_KEY = '_ggb_enabled';
     const SLOTS_KEY = '_ggb_slots';
     const MIN_KEY = '_ggb_min_items';
@@ -443,7 +443,7 @@ final class GGB_Gift_Box {
             }
             $tag = $mode === 'fixed' ? 'div' : 'label';
             echo '<' . $tag . ' class="ggb-option' . ($in_stock ? '' : ' is-out') . '">'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-            echo '<span class="ggb-thumb">' . $p->get_image('woocommerce_thumbnail') . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+            echo '<span class="ggb-thumb">' . $p->get_image('woocommerce_thumbnail', ['sizes' => '240px']) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
             // The tick box goes next to the name, so every photo stays in the same column.
             echo '<span class="ggb-field">' . ($first ? $title : '') . '<span class="ggb-line">' . $input . '<span class="ggb-name">' . esc_html($p->get_name()); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
             if ($mode === 'fixed' && $slot['min'] > 1) echo ' × ' . (int) $slot['min'];

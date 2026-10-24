@@ -32,6 +32,12 @@ label.ggb-option { cursor: pointer; }
 .ggb-errors { color: #a00; margin-top: .5em; }
 .ggb-errors p { margin: 0 0 .25em; }
 .ggb-form .quantity { display: inline-block; margin-right: .5em; }
+/* Hover: the photo grows over the page without moving anything (mouse only, not touch). */
+@media (hover: hover) {
+  .ggb-thumb { overflow: visible; position: relative; }
+  .ggb-box .ggb-thumb img { position: relative; transform-origin: left center; transition: transform .2s ease, box-shadow .2s ease; }
+  .ggb-box .ggb-thumb:hover img { transform: scale(2.5); z-index: 20; box-shadow: 0 6px 24px rgba(0, 0, 0, .25); }
+}
 @media (max-width: 480px) {
   .ggb-box { --ggb-photo: 72px; --ggb-gap: 22px; }
 }
