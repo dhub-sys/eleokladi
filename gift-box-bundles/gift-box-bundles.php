@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Gift Box Bundles
  * Description: Συσκευασίες δώρου (κουτιά) με θέσεις προϊόντων: σταθερά προϊόντα, επιλογή από λίστα, ελάχιστο/μέγιστο πλήθος. Το κουτί χρεώνεται με τη δική του τιμή και κάθε προϊόν μπαίνει στο καλάθι ως δική του γραμμή (απόθεμα, ΦΠΑ).
- * Version: 1.1.1
+ * Version: 1.2.0
  * Requires Plugins: woocommerce
  * Requires PHP: 7.4
  * Author: Custom
@@ -21,11 +21,13 @@ if (!defined('ABSPATH')) exit;
  * cannot be removed or changed on their own, and are removed with the box.
  */
 final class GGB_Gift_Box {
-    const VERSION = '1.1.1';
+    const VERSION = '1.2.0';
     const ENABLED_KEY = '_ggb_enabled';
     const SLOTS_KEY = '_ggb_slots';
     const MIN_KEY = '_ggb_min_items';
     const MAX_KEY = '_ggb_max_items';
+    /** Photo shown next to a dropdown before the customer picks, when its slot has none. */
+    const IMAGE_KEY = '_ggb_image';
     /** Set while the plugin itself removes box lines, so the removal hooks do not recurse. */
     private static $removing = false;
     /** Product IDs whose box was printed on this page, for the shortcode and the diagnostics. */
@@ -108,6 +110,7 @@ final class GGB_Gift_Box {
             'min' => $min,
             'max' => $max,
             'repeat' => $repeat,
+            'image' => absint($slot['image'] ?? 0),
         ];
     }
     /**
@@ -185,6 +188,9 @@ final class GGB_Gift_Box {
                 'value' => $product ? ($product->get_meta($key, true) ?: '') : '',
             ]);
         }
+        echo '<p class="form-field"><label>Φωτογραφία πριν την επιλογή</label>'
+            . self::image_field(self::IMAGE_KEY, $product ? absint($product->get_meta(self::IMAGE_KEY, true)) : 0)
+            . '<span class="description" style="display:block;clear:both">Φαίνεται δίπλα σε κάθε dropdown μέχρι ο πελάτης να διαλέξει προϊόν. Κάθε θέση μπορεί να έχει και δική της (π.χ. μια φωτογραφία ελιών).</span></p>';
         echo '</div>';
         echo '<div class="options_group ggb-admin">';
         echo '<h4 style="padding:0 12px">Θέσεις του κουτιού</h4>';
@@ -197,8 +203,16 @@ final class GGB_Gift_Box {
         echo '<p style="padding:0 12px"><button type="button" class="button ggb-add-slot">+ Προσθήκη θέσης</button></p>';
         // Keeps "all slots removed" saveable.
         echo '<input type="hidden" name="ggb_slots[__empty]" value="">';
-        echo '<script type="text/html" id="ggb-slot-template">' . self::slot_admin_html('__i__', ['label' => '', 'products' => [], 'min' => 1, 'max' => 1, 'repeat' => false], $product) . '</script>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+        echo '<script type="text/html" id="ggb-slot-template">' . self::slot_admin_html('__i__', ['label' => '', 'products' => [], 'min' => 1, 'max' => 1, 'repeat' => false, 'image' => 0], $product) . '</script>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
         echo '</div></div>';
+    }
+    /** Media-library picker: hidden attachment ID, preview, choose/remove buttons (assets/js/admin.js). */
+    private static function image_field($name, $image_id) {
+        $src = $image_id ? wp_get_attachment_image_url($image_id, 'thumbnail') : '';
+        return '<span class="ggb-image-field"><input type="hidden" name="' . esc_attr($name) . '" value="' . ($image_id ?: '') . '">'
+            . '<img src="' . esc_url($src) . '" alt="" style="width:60px;height:60px;object-fit:cover;vertical-align:middle;margin-right:8px;border-radius:4px;' . ($src ? '' : 'display:none') . '">'
+            . '<button type="button" class="button ggb-image-choose">Επιλογή εικόνας</button> '
+            . '<button type="button" class="button-link button-link-delete ggb-image-remove"' . ($src ? '' : ' style="display:none"') . '>Αφαίρεση</button></span>';
     }
     private static function slot_admin_html($i, $slot, $product) {
         $name = 'ggb_slots[' . $i . ']';
@@ -219,6 +233,8 @@ final class GGB_Gift_Box {
             . ($product && $product->get_id() ? ' data-exclude="' . esc_attr($product->get_id()) . '"' : '') . '>' . $options . '</select></p>';
         $html .= '<p class="form-field"><label>Πόσα παίρνει</label>από <input type="number" min="0" step="1" style="width:70px;float:none" name="' . $name . '[min]" value="' . esc_attr($slot['min']) . '"> '
             . 'έως <input type="number" min="1" step="1" style="width:70px;float:none" name="' . $name . '[max]" value="' . esc_attr($slot['max']) . '"></p>';
+        $html .= '<p class="form-field"><label>Φωτογραφία πριν την επιλογή</label>' . self::image_field($name . '[image]', (int) ($slot['image'] ?? 0))
+            . '<span class="description" style="display:block;clear:both">Κενό = η φωτογραφία του κουτιού (παραπάνω).</span></p>';
         $html .= '<p class="form-field"><label>Ίδιο προϊόν πολλές φορές</label><input type="checkbox" name="' . $name . '[repeat]" value="1" ' . checked(!empty($slot['repeat']), true, false) . '> <span class="description">Π.χ. 2 ίδια βάζα ελιές. Χωρίς αυτό, κάθε προϊόν μπαίνει το πολύ μία φορά.</span></p>';
         foreach ($warnings as $warning) $html .= '<p style="color:#b32d2e;margin:4px 0">⚠ ' . esc_html($warning) . '</p>';
         $html .= '<p style="text-align:right;margin:0"><button type="button" class="button-link button-link-delete ggb-remove-slot">Διαγραφή θέσης</button></p>';
@@ -234,6 +250,9 @@ final class GGB_Gift_Box {
             if ($value) $product->update_meta_data($key, $value);
             else $product->delete_meta_data($key);
         }
+        $image = isset($_POST[self::IMAGE_KEY]) ? absint(wp_unslash($_POST[self::IMAGE_KEY])) : 0;
+        if ($image) $product->update_meta_data(self::IMAGE_KEY, $image);
+        else $product->delete_meta_data(self::IMAGE_KEY);
         $slots = [];
         foreach (wp_unslash($_POST['ggb_slots']) as $key => $slot) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- clean_slot sanitises
             if ($key === '__empty' || !is_array($slot)) continue;
@@ -247,6 +266,7 @@ final class GGB_Gift_Box {
     }
     public static function admin_assets($hook) {
         if (!in_array($hook, ['post.php', 'post-new.php'], true) || get_post_type() !== 'product') return;
+        wp_enqueue_media();
         wp_enqueue_script('ggb-admin', plugin_dir_url(__FILE__) . 'assets/js/admin.js', ['jquery', 'wc-enhanced-select'], self::VERSION, true);
     }
 
@@ -293,7 +313,8 @@ final class GGB_Gift_Box {
         $fee = (float) wc_get_price_to_display($product);
         printf('<div class="ggb-box" data-product="%d" data-min="%d" data-max="%d" data-fee="%s">', $product->get_id(), $config['min'], $config['max'], esc_attr($fee));
         echo '<input type="hidden" name="ggb_box" value="1">';
-        foreach ($config['slots'] as $s => $slot) self::render_slot($s, $slot);
+        $default = absint($product->get_meta(self::IMAGE_KEY, true));
+        foreach ($config['slots'] as $s => $slot) self::render_slot($s, $slot, $default);
         echo '<div class="ggb-summary">';
         echo '<p class="ggb-count-line">' . esc_html__('Produits dans le coffret :', 'gift-box-bundles') . ' <strong class="ggb-count">0</strong>';
         if ($config['min'] && $config['min'] === $config['max']) echo ' / ' . (int) $config['max'];
@@ -372,7 +393,7 @@ final class GGB_Gift_Box {
         foreach ($problems as $problem) echo '<li>' . esc_html($problem) . '</li>';
         echo '</ul><button type="button" onclick="this.parentNode.remove()" style="position:absolute;top:6px;right:8px;background:none;border:0;font-size:18px;cursor:pointer" aria-label="Κλείσιμο">×</button></div>';
     }
-    private static function render_slot($s, $slot) {
+    private static function render_slot($s, $slot, $default_image = 0) {
         $mode = self::slot_mode($slot);
         $label = $slot['label'] !== '' ? $slot['label'] : sprintf(__('Produit %d', 'gift-box-bundles'), $s + 1);
         if ($mode === 'fixed') $hint = __('inclus', 'gift-box-bundles');
@@ -391,14 +412,16 @@ final class GGB_Gift_Box {
             foreach ($products as $id => $p) {
                 $price = (float) wc_get_price_to_display($p);
                 $in_stock = $p->is_in_stock();
-                $image = $p->get_image_id() ? wp_get_attachment_image_url($p->get_image_id(), 'woocommerce_gallery_thumbnail') : wc_placeholder_img_src('woocommerce_gallery_thumbnail');
+                $image = $p->get_image_id() ? wp_get_attachment_image_url($p->get_image_id(), 'woocommerce_thumbnail') : wc_placeholder_img_src('woocommerce_thumbnail');
                 $text = $p->get_name() . ' — ' . html_entity_decode(wp_strip_all_tags(wc_price($price)), ENT_QUOTES, 'UTF-8') . ($in_stock ? '' : ' (' . __('Épuisé', 'gift-box-bundles') . ')');
                 $options .= '<option value="' . (int) $id . '" data-price="' . esc_attr($price) . '" data-img="' . esc_url($image) . '"' . ($in_stock ? '' : ' data-out="1" disabled') . '>' . esc_html($text) . '</option>';
             }
+            $placeholder_id = $slot['image'] ?: $default_image;
+            $placeholder_src = ($placeholder_id ? wp_get_attachment_image_url($placeholder_id, 'woocommerce_thumbnail') : '') ?: wc_placeholder_img_src('woocommerce_thumbnail');
             for ($k = 0; $k < $slot['max']; $k++) {
                 $placeholder = $k < $slot['min'] ? __('— Choisissez un produit —', 'gift-box-bundles') : __('— Aucun (facultatif) —', 'gift-box-bundles');
                 $aria = $slot['max'] > 1 ? $label . ' ' . ($k + 1) : $label;
-                echo '<div class="ggb-choice"><span class="ggb-thumb" aria-hidden="true"></span>';
+                echo '<div class="ggb-choice"><span class="ggb-thumb" aria-hidden="true" data-default="' . esc_url($placeholder_src) . '"><img src="' . esc_url($placeholder_src) . '" alt=""></span>';
                 echo '<select class="ggb-select uk-select" name="ggb[' . (int) $s . '][]" aria-label="' . esc_attr($aria) . '"><option value="" data-price="0">' . esc_html($placeholder) . '</option>' . $options . '</select></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
             }
             echo '</div></fieldset>';
@@ -416,7 +439,7 @@ final class GGB_Gift_Box {
             $tag = $mode === 'fixed' ? 'div' : 'label';
             echo '<' . $tag . ' class="ggb-option' . ($in_stock ? '' : ' is-out') . '">'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
             echo $input; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-            echo '<span class="ggb-thumb">' . $p->get_image('woocommerce_gallery_thumbnail') . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+            echo '<span class="ggb-thumb">' . $p->get_image('woocommerce_thumbnail') . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
             echo '<span class="ggb-name">' . esc_html($p->get_name());
             if ($mode === 'fixed' && $slot['min'] > 1) echo ' × ' . (int) $slot['min'];
             echo '</span><span class="ggb-price">' . wc_price($price) . '</span>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped

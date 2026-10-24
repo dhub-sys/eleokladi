@@ -103,9 +103,12 @@ jQuery(function ($) {
         $(this).toggleClass('is-chosen', $i.is('.ggb-fixed') || $i.is(':checked'));
       });
       $box.find('.ggb-choice').each(function () {
-        const $o = $(this).find('option:selected');
-        const img = $(this).find('select').val() ? $o.data('img') : '';
-        $(this).toggleClass('is-chosen', !!img).find('.ggb-thumb').html(img ? $('<img alt="">').attr('src', img) : '');
+        const chosen = !!$(this).find('select').val();
+        const $thumb = $(this).find('.ggb-thumb');
+        // Before a choice: the photo set on the box/slot.
+        const img = chosen ? $(this).find('option:selected').data('img') : $thumb.data('default');
+        $(this).toggleClass('is-chosen', chosen);
+        if (img && $thumb.find('img').attr('src') !== img) $thumb.html($('<img alt="">').attr('src', img));
       });
       if (tried) showProblems(problems(st));
       return st;

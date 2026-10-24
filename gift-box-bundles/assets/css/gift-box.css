@@ -4,21 +4,22 @@
 body:has(form.ggb-form) form.cart:not(.ggb-form):has(.ggb-box) { display: none; }
 .ggb-form, .ggb-box { display: block; width: 100%; flex: 1 0 100%; box-sizing: border-box; }
 .ggb-box { margin: 0 0 1.5em; }
-.ggb-slot { border: 0; margin: 0 0 1.1em; padding: 0; min-width: 0; }
-.ggb-slot legend { font-weight: 600; padding: 0; margin: 0 0 .4em; }
+.ggb-slot { border: 0; margin: 0 0 1.75em; padding: 0; min-width: 0; }
+.ggb-slot legend { font-weight: 600; padding: 0; margin: 0 0 .6em; border: 0; }
 .ggb-hint { font-weight: 400; opacity: .7; font-size: .9em; }
-.ggb-options { display: grid; gap: .5em; }
+.ggb-options { display: grid; gap: .9em; }
 /* Dropdowns */
-.ggb-choice { display: flex; align-items: center; gap: .75em; }
-.ggb-choice .ggb-thumb { flex: none; width: 44px; height: 44px; border-radius: 4px; background: rgba(0, 0, 0, .04); overflow: hidden; }
+.ggb-choice { display: flex; align-items: center; gap: 1em; }
+.ggb-thumb { flex: none; width: 72px; height: 72px; border: 0; border-radius: 6px; overflow: hidden; line-height: 0; }
 .ggb-choice select { flex: 1 1 auto; min-width: 0; width: 100%; max-width: 100%; }
 .ggb-choice select:not(.uk-select) { min-height: 44px; padding: .4em .6em; font: inherit; border: 1px solid rgba(0, 0, 0, .2); border-radius: 4px; background-color: #fff; }
 /* Included / optional single products */
-.ggb-option { display: flex; align-items: center; gap: .75em; margin: 0; }
+.ggb-option { display: flex; align-items: center; gap: 1em; margin: 0; }
 label.ggb-option { cursor: pointer; }
 .ggb-option.is-out { opacity: .5; cursor: not-allowed; }
 .ggb-option input[type="checkbox"] { margin: 0; flex: none; }
-.ggb-thumb img { width: 44px; height: 44px; object-fit: cover; border-radius: 4px; display: block; }
+/* The theme may give images a border, shadow or margin: keep the photo clean. */
+.ggb-box .ggb-thumb img { width: 72px; height: 72px; max-width: none; object-fit: cover; border: 0; box-shadow: none; margin: 0; padding: 0; border-radius: 6px; display: block; }
 .ggb-name { flex: 1 1 auto; }
 .ggb-price { white-space: nowrap; font-size: .95em; }
 .ggb-out { font-size: .85em; color: #a00; }
@@ -28,6 +29,9 @@ label.ggb-option { cursor: pointer; }
 .ggb-errors { color: #a00; margin-top: .5em; }
 .ggb-errors p { margin: 0 0 .25em; }
 .ggb-form .quantity { display: inline-block; margin-right: .5em; }
+@media (max-width: 480px) {
+  .ggb-thumb, .ggb-box .ggb-thumb img { width: 56px; height: 56px; }
+}
 /* Cart: the box's products under the box */
 .woocommerce-cart-form .ggb-child td.product-name { padding-left: 2em; }
 .woocommerce-cart-form .ggb-child td.product-name::before { content: "↳ "; opacity: .6; }
