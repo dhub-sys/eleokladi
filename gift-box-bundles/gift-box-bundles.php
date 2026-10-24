@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Gift Box Bundles
  * Description: Συσκευασίες δώρου (κουτιά) με θέσεις προϊόντων: σταθερά προϊόντα, επιλογή από λίστα, ελάχιστο/μέγιστο πλήθος. Το κουτί χρεώνεται με τη δική του τιμή και κάθε προϊόν μπαίνει στο καλάθι ως δική του γραμμή (απόθεμα, ΦΠΑ).
- * Version: 1.1.0
+ * Version: 1.1.1
  * Requires Plugins: woocommerce
  * Requires PHP: 7.4
  * Author: Custom
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) exit;
  * cannot be removed or changed on their own, and are removed with the box.
  */
 final class GGB_Gift_Box {
-    const VERSION = '1.1.0';
+    const VERSION = '1.1.1';
     const ENABLED_KEY = '_ggb_enabled';
     const SLOTS_KEY = '_ggb_slots';
     const MIN_KEY = '_ggb_min_items';
@@ -291,7 +291,7 @@ final class GGB_Gift_Box {
         self::enqueue();
         $config = self::config($product);
         $fee = (float) wc_get_price_to_display($product);
-        printf('<div class="ggb-box" data-min="%d" data-max="%d" data-fee="%s">', $config['min'], $config['max'], esc_attr($fee));
+        printf('<div class="ggb-box" data-product="%d" data-min="%d" data-max="%d" data-fee="%s">', $product->get_id(), $config['min'], $config['max'], esc_attr($fee));
         echo '<input type="hidden" name="ggb_box" value="1">';
         foreach ($config['slots'] as $s => $slot) self::render_slot($s, $slot);
         echo '<div class="ggb-summary">';

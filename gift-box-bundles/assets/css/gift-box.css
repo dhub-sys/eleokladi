@@ -1,4 +1,7 @@
 /* Gift Box Bundles - product page */
+/* [gift_box] on the page: hide the duplicate box in the theme's add-to-cart form before
+ * the first paint (gift-box.js does the same for browsers without :has). */
+body:has(form.ggb-form) form.cart:not(.ggb-form):has(.ggb-box) { display: none; }
 .ggb-form, .ggb-box { display: block; width: 100%; flex: 1 0 100%; box-sizing: border-box; }
 .ggb-box { margin: 0 0 1.5em; }
 .ggb-slot { border: 0; margin: 0 0 1.1em; padding: 0; min-width: 0; }

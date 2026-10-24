@@ -18,6 +18,12 @@ jQuery(function ($) {
     return '<span class="woocommerce-Price-amount amount"><bdi>' + $('<div>').text(formatAmount(amount)).html() + '</bdi></span>';
   }
 
+  // With [gift_box] on the page, the box that the theme's own add-to-cart form (e.g. YOOtheme's
+  // Add to Cart element) also shows is a duplicate: hide that whole form.
+  $('form.ggb-form .ggb-box').each(function () {
+    $('.ggb-box[data-product="' + $(this).data('product') + '"]').not(this).closest('form').not('.ggb-form').hide()
+      .find('.ggb-box').remove();
+  });
   $('.ggb-box').each(function () { setup($(this)); });
 
   function setup($box) {
