@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Gift Box Bundles
  * Description: Συσκευασίες δώρου (κουτιά) με θέσεις προϊόντων: σταθερά προϊόντα, επιλογή από λίστα, ελάχιστο/μέγιστο πλήθος. Το κουτί χρεώνεται με τη δική του τιμή και κάθε προϊόν μπαίνει στο καλάθι ως δική του γραμμή (απόθεμα, ΦΠΑ).
- * Version: 1.2.2
+ * Version: 1.3.0
  * Requires Plugins: woocommerce
  * Requires PHP: 7.4
  * Author: Custom
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) exit;
  * cannot be removed or changed on their own, and are removed with the box.
  */
 final class GGB_Gift_Box {
-    const VERSION = '1.2.2';
+    const VERSION = '1.3.0';
     const ENABLED_KEY = '_ggb_enabled';
     const SLOTS_KEY = '_ggb_slots';
     const MIN_KEY = '_ggb_min_items';
@@ -291,9 +291,11 @@ final class GGB_Gift_Box {
                 'thousandSep' => wc_get_price_thousand_separator(),
             ],
             'i18n' => [
-                'slotMin' => __('« %1$s » : choisissez au moins %2$d produit(s).', 'gift-box-bundles'),
+                'tipTitle' => __('Votre coffret n\'est pas encore complet', 'gift-box-bundles'),
+                'left' => __('Choisissez encore %d produits.', 'gift-box-bundles'),
+                'leftOne' => __('Choisissez encore 1 produit.', 'gift-box-bundles'),
+                'toChoose' => __('À choisir : %s', 'gift-box-bundles'),
                 'slotMax' => __('« %1$s » : %2$d produit(s) maximum.', 'gift-box-bundles'),
-                'boxMin' => __('Votre coffret doit contenir au moins %d produits.', 'gift-box-bundles'),
                 'boxMax' => __('Votre coffret peut contenir au maximum %d produits.', 'gift-box-bundles'),
             ],
         ]);
@@ -325,7 +327,6 @@ final class GGB_Gift_Box {
         echo '<p class="ggb-fee-line">' . esc_html__('Coffret :', 'gift-box-bundles') . ' ' . wc_price($fee) . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
         echo '<p class="ggb-total-line">' . esc_html__('Total :', 'gift-box-bundles') . ' <strong class="ggb-total">' . wc_price($fee) . '</strong></p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
         echo '</div>';
-        echo '<div class="ggb-errors" role="alert" hidden></div>';
         echo '</div>';
     }
     /**

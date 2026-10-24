@@ -29,8 +29,14 @@ label.ggb-option { cursor: pointer; }
 .ggb-summary { border-top: 1px solid rgba(0, 0, 0, .1); padding-top: .75em; }
 .ggb-summary p { margin: 0 0 .3em; }
 .ggb-total-line { font-size: 1.15em; }
-.ggb-errors { color: #a00; margin-top: .5em; }
-.ggb-errors p { margin: 0 0 .25em; }
+/* Tooltip above the add-to-cart button when the box is incomplete */
+.ggb-tip { position: absolute; z-index: 30; width: max-content; max-width: min(380px, 90vw); padding: 14px 18px; background: #2f3a2c; color: #fff; border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .25); font-size: 1rem; line-height: 1.45; animation: ggb-tip-in .18s ease-out; }
+.ggb-tip::after { content: ""; position: absolute; left: 28px; bottom: -8px; border: 8px solid transparent; border-bottom: 0; border-top-color: #2f3a2c; }
+.ggb-tip-title { display: block; margin-bottom: .35em; font-size: 1.05em; color: #fff; }
+.ggb-tip-body p { margin: 0 0 .2em; color: #fff; }
+@keyframes ggb-tip-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* Dropdowns still to fill */
+.ggb-missing select { border-color: #c0392b !important; box-shadow: 0 0 0 2px rgba(192, 57, 43, .18); }
 .ggb-form .quantity { display: inline-block; margin-right: .5em; }
 /* Hover: the photo grows over the page without moving anything (mouse only, not touch). */
 @media (hover: hover) {
