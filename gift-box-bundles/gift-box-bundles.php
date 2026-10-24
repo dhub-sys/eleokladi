@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Gift Box Bundles
  * Description: Συσκευασίες δώρου (κουτιά) με θέσεις προϊόντων: σταθερά προϊόντα, επιλογή από λίστα, ελάχιστο/μέγιστο πλήθος. Το κουτί χρεώνεται με τη δική του τιμή και κάθε προϊόν μπαίνει στο καλάθι ως δική του γραμμή (απόθεμα, ΦΠΑ).
- * Version: 1.0.0
+ * Version: 1.0.1
  * Requires Plugins: woocommerce
  * Requires PHP: 7.4
  * Author: Custom
@@ -21,13 +21,15 @@ if (!defined('ABSPATH')) exit;
  * cannot be removed or changed on their own, and are removed with the box.
  */
 final class GGB_Gift_Box {
-    const VERSION = '1.0.0';
+    const VERSION = '1.0.1';
     const ENABLED_KEY = '_ggb_enabled';
     const SLOTS_KEY = '_ggb_slots';
     const MIN_KEY = '_ggb_min_items';
     const MAX_KEY = '_ggb_max_items';
     /** Set while the plugin itself removes box lines, so the removal hooks do not recurse. */
     private static $removing = false;
+    /** Product IDs whose box was printed on this page, for the shortcode and the diagnostics. */
+    private static $rendered = [];
 
     public static function init() {
         // Admin: product tab.
@@ -38,6 +40,9 @@ final class GGB_Gift_Box {
         // Product page.
         add_action('wp_enqueue_scripts', [__CLASS__, 'assets']);
         add_action('woocommerce_before_add_to_cart_button', [__CLASS__, 'render'], 5);
+        // For page builders / themes whose product template has no WooCommerce add-to-cart form.
+        add_shortcode('gift_box', [__CLASS__, 'shortcode']);
+        add_action('wp_footer', [__CLASS__, 'diagnostics']);
         add_filter('woocommerce_get_price_html', [__CLASS__, 'price_html'], 20, 2);
         // Listings: the box needs its product page, never a direct/AJAX add to cart.
         add_filter('woocommerce_product_supports', [__CLASS__, 'supports'], 10, 3);
@@ -147,6 +152,18 @@ final class GGB_Gift_Box {
         $slots = $product ? $product->get_meta(self::SLOTS_KEY, true) : [];
         $slots = is_array($slots) ? array_values(array_filter(array_map([__CLASS__, 'clean_slot'], $slots))) : [];
         echo '<div id="ggb_product_data" class="panel woocommerce_options_panel hidden">';
+        if ($product && $product->get_id() && ($product->get_meta(self::ENABLED_KEY, true) === 'yes' || $slots)) {
+            $problems = self::problems($product);
+            echo '<div style="margin:12px;padding:8px 12px;border-left:4px solid ' . ($problems ? '#b32d2e' : '#00a32a') . ';background:#fff">';
+            if ($problems) {
+                echo '<strong>Δεν εμφανίζεται στον πελάτη:</strong><ul style="list-style:disc;margin:4px 0 0 18px">';
+                foreach ($problems as $problem) echo '<li>' . esc_html($problem) . '</li>';
+                echo '</ul>';
+            } else {
+                echo '✔ Οι ρυθμίσεις είναι σωστές. Αν οι επιλογές δεν φαίνονται στη σελίδα του προϊόντος, βάλτε το shortcode <code>[gift_box]</code> στο πρότυπο της σελίδας.';
+            }
+            echo '</div>';
+        }
         echo '<div class="options_group">';
         woocommerce_wp_checkbox([
             'id' => self::ENABLED_KEY,
@@ -239,7 +256,10 @@ final class GGB_Gift_Box {
     public static function assets() {
         if (!is_product()) return;
         $product = wc_get_product(get_queried_object_id());
-        if (!self::is_box($product)) return;
+        if (self::is_box($product)) self::enqueue();
+    }
+    private static function enqueue() {
+        if (wp_script_is('ggb-gift-box', 'enqueued')) return;
         wp_enqueue_style('ggb-gift-box', plugin_dir_url(__FILE__) . 'assets/css/gift-box.css', [], self::VERSION);
         wp_enqueue_script('ggb-gift-box', plugin_dir_url(__FILE__) . 'assets/js/gift-box.js', ['jquery'], self::VERSION, true);
         wp_localize_script('ggb-gift-box', 'GGBData', [
@@ -260,7 +280,14 @@ final class GGB_Gift_Box {
     }
     public static function render() {
         global $product;
-        if (!self::is_box($product)) return;
+        if (self::is_box($product)) self::render_box($product);
+    }
+    private static function render_box($product) {
+        // One box per product and page: a theme that calls the hook twice or the shortcode
+        // next to the normal form would otherwise post every choice twice.
+        if (isset(self::$rendered[$product->get_id()])) return;
+        self::$rendered[$product->get_id()] = true;
+        self::enqueue();
         $config = self::config($product);
         $fee = (float) wc_get_price_to_display($product);
         printf('<div class="ggb-box" data-min="%d" data-max="%d" data-fee="%s">', $config['min'], $config['max'], esc_attr($fee));
@@ -278,6 +305,62 @@ final class GGB_Gift_Box {
         echo '</div>';
         echo '<div class="ggb-errors" role="alert" hidden></div>';
         echo '</div>';
+    }
+    /**
+     * [gift_box] or [gift_box id="123"]: the box with its own add-to-cart form, for product
+     * templates (page builders) that do not print WooCommerce's add-to-cart form.
+     * Prints nothing if the page already shows the box inside the normal form.
+     */
+    public static function shortcode($atts) {
+        $atts = shortcode_atts(['id' => 0], $atts, 'gift_box');
+        $id = absint($atts['id']) ?: (is_product() ? get_queried_object_id() : 0);
+        $product = $id ? wc_get_product($id) : null;
+        if (!self::is_box($product) || isset(self::$rendered[$product->get_id()])) return '';
+        if (!$product->is_purchasable() || !$product->is_in_stock()) return '';
+        ob_start();
+        echo '<form class="cart ggb-form" action="' . esc_url($product->get_permalink()) . '" method="post" enctype="multipart/form-data">';
+        self::render_box($product);
+        woocommerce_quantity_input(['min_value' => 1, 'max_value' => $product->get_max_purchase_quantity(), 'input_value' => 1], $product);
+        echo '<button type="submit" name="add-to-cart" value="' . esc_attr($product->get_id()) . '" class="single_add_to_cart_button button alt">' . esc_html($product->single_add_to_cart_text()) . '</button>';
+        echo '</form>';
+        return ob_get_clean();
+    }
+    /** Why a box cannot be shown/bought, in Greek for the shop manager. [] = all fine. */
+    public static function problems($product) {
+        $problems = [];
+        if (!$product) return ['Το προϊόν δεν βρέθηκε.'];
+        if (!$product->is_type('simple')) $problems[] = 'Το προϊόν δεν είναι «Απλό προϊόν» (Simple product).';
+        if ($product->get_meta(self::ENABLED_KEY, true) !== 'yes') $problems[] = 'Δεν είναι τσεκαρισμένο το «Είναι συσκευασία δώρου» (καρτέλα «Συσκευασία δώρου»).';
+        if ($product->get_price() === '') $problems[] = 'Δεν έχει κανονική τιμή (καρτέλα «Γενικά»). Χωρίς τιμή το WooCommerce δεν εμφανίζει το κουμπί/τη φόρμα αγοράς, άρα ούτε τις επιλογές.';
+        elseif (!$product->is_purchasable()) $problems[] = 'Το WooCommerce δεν το θεωρεί διαθέσιμο για αγορά (κατάσταση δημοσίευσης ή άλλο plugin).';
+        if (!$product->is_in_stock()) $problems[] = 'Είναι «Εξαντλημένο» (καρτέλα «Απόθεμα»). Τότε το WooCommerce δεν εμφανίζει τη φόρμα αγοράς.';
+        if ($problems) return $problems;
+        $config = self::config($product);
+        if (!$config['slots']) return ['Δεν έχει αποθηκευμένες θέσεις με προϊόντα (καρτέλα «Συσκευασία δώρου» > «+ Προσθήκη θέσης», διαλέξτε προϊόντα, Ενημέρωση).'];
+        foreach ($config['slots'] as $s => $slot) {
+            $usable = array_filter($slot['products'], function ($id) { return (bool) self::option_product($id); });
+            if (!$usable) $problems[] = 'Η θέση «' . ($slot['label'] ?: ($s + 1)) . '» δεν έχει κανένα προϊόν διαθέσιμο για αγορά (ελέγξτε τιμή/κατάσταση· σε προϊόντα με παραλλαγές διαλέξτε την παραλλαγή).';
+        }
+        if (!$problems && self::min_total($product) === null) $problems[] = 'Το κουτί δεν μπορεί να γεμίσει: τα διαθέσιμα (σε απόθεμα) προϊόντα δεν φτάνουν το ελάχιστο των θέσεων ή του κουτιού.';
+        return $problems;
+    }
+    /** Shop managers only: a note on a box's product page when the box is missing or cannot be filled. */
+    public static function diagnostics() {
+        if (!is_product() || !current_user_can('manage_woocommerce')) return;
+        $product = wc_get_product(get_queried_object_id());
+        if (!$product) return;
+        $configured = $product->get_meta(self::ENABLED_KEY, true) === 'yes' || $product->get_meta(self::SLOTS_KEY, true);
+        if (!$configured) return;
+        $problems = self::problems($product);
+        if (!$problems && !isset(self::$rendered[$product->get_id()])) {
+            $problems[] = 'Οι ρυθμίσεις είναι σωστές, αλλά το θέμα/page builder δεν εμφανίζει τη φόρμα «Προσθήκη στο καλάθι» του WooCommerce (hook woocommerce_before_add_to_cart_button). '
+                . 'Βάλτε το shortcode [gift_box] στο πρότυπο της σελίδας προϊόντος, στη θέση του κουμπιού «Προσθήκη στο καλάθι».';
+        }
+        if (!$problems) return;
+        echo '<div class="ggb-diagnostics" style="position:fixed;left:16px;right:16px;bottom:16px;z-index:99999;max-width:720px;margin:auto;background:#fff;border:2px dashed #b32d2e;padding:12px 16px;font:14px/1.5 sans-serif;color:#1d2327;box-shadow:0 4px 16px rgba(0,0,0,.2)">';
+        echo '<strong>Συσκευασία δώρου — δεν εμφανίζεται στον πελάτη</strong> <small>(το βλέπουν μόνο οι διαχειριστές)</small><ul style="margin:6px 0 0 18px">';
+        foreach ($problems as $problem) echo '<li>' . esc_html($problem) . '</li>';
+        echo '</ul><button type="button" onclick="this.parentNode.remove()" style="position:absolute;top:6px;right:8px;background:none;border:0;font-size:18px;cursor:pointer" aria-label="Κλείσιμο">×</button></div>';
     }
     private static function render_slot($s, $slot) {
         $mode = self::slot_mode($slot);
