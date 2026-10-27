@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Gift Box Bundles
  * Description: Συσκευασίες δώρου (κουτιά) με θέσεις προϊόντων: σταθερά προϊόντα, επιλογή από λίστα, ελάχιστο/μέγιστο πλήθος. Το κουτί χρεώνεται με τη δική του τιμή και κάθε προϊόν μπαίνει στο καλάθι ως δική του γραμμή (απόθεμα, ΦΠΑ).
- * Version: 1.3.1
+ * Version: 1.3.2
  * Requires Plugins: woocommerce
  * Requires PHP: 7.4
  * Author: Custom
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) exit;
  * cannot be removed or changed on their own, and are removed with the box.
  */
 final class GGB_Gift_Box {
-    const VERSION = '1.3.1';
+    const VERSION = '1.3.2';
     const ENABLED_KEY = '_ggb_enabled';
     const SLOTS_KEY = '_ggb_slots';
     const MIN_KEY = '_ggb_min_items';
@@ -195,7 +195,7 @@ final class GGB_Gift_Box {
         echo '<div class="options_group ggb-admin">';
         echo '<h4 style="padding:0 12px">Θέσεις του κουτιού</h4>';
         echo '<p class="description" style="padding:0 12px">Κάθε θέση: τα προϊόντα που προτείνετε και πόσα από αυτά παίρνει ο πελάτης. '
-            . 'Ένα προϊόν με ελάχιστο = μέγιστο = 1 εμφανίζεται ως «περιλαμβάνεται» (χωρίς επιλογή). Ένα προϊόν με ελάχιστο 0 εμφανίζεται ως τσεκαρισμένο κουτάκι που ο πελάτης μπορεί να βγάλει. '
+            . 'Ένα προϊόν με ελάχιστο = μέγιστο = 1 εμφανίζεται ως «περιλαμβάνεται» (χωρίς επιλογή). Ένα προϊόν με ελάχιστο 0 εμφανίζεται ως κουτάκι που τσεκάρει ο πελάτης αν το θέλει. '
             . 'Όπου υπάρχει επιλογή, ο πελάτης βλέπει ένα dropdown για κάθε προϊόν της θέσης (π.χ. «από 0 έως 2» = 2 dropdown). Το «ίδιο προϊόν πολλές φορές» επιτρέπει να διαλέξει το ίδιο προϊόν σε περισσότερα από ένα dropdown.</p>';
         echo '<div class="ggb-slots">';
         foreach ($slots as $i => $slot) echo self::slot_admin_html($i, $slot, $product); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
@@ -398,8 +398,8 @@ final class GGB_Gift_Box {
         $mode = self::slot_mode($slot);
         $label = $slot['label'] !== '' ? $slot['label'] : sprintf(__('Produit %d', 'gift-box-bundles'), $s + 1);
         if ($mode === 'fixed') $hint = __('inclus', 'gift-box-bundles');
-        // A lone optional product comes ticked: say it can be taken out.
-        elseif ($mode === 'check') $hint = __('inclus — décochez pour le retirer', 'gift-box-bundles');
+        // A lone optional product comes unticked: the customer adds it.
+        elseif ($mode === 'check') $hint = __('facultatif — cochez pour l\'ajouter', 'gift-box-bundles');
         elseif ($slot['min'] === $slot['max']) $hint = $slot['max'] === 1 ? '' : sprintf(__('choisissez %d', 'gift-box-bundles'), $slot['max']);
         elseif ($slot['min'] === 0) $hint = $slot['max'] === 1 ? __('facultatif', 'gift-box-bundles') : sprintf(__('jusqu\'à %d, facultatif', 'gift-box-bundles'), $slot['max']);
         else $hint = sprintf(__('de %1$d à %2$d', 'gift-box-bundles'), $slot['min'], $slot['max']);
@@ -441,8 +441,8 @@ final class GGB_Gift_Box {
             if ($mode === 'fixed') {
                 $input = '<input type="hidden" name="ggb_qty[' . (int) $s . '][' . (int) $id . ']" value="' . (int) $slot['min'] . '" data-price="' . esc_attr($price) . '" class="ggb-fixed">';
             } else {
-                // A lone optional product is in the box unless the customer takes it out.
-                $input = '<input type="checkbox" class="uk-checkbox" name="ggb[' . (int) $s . '][]" value="' . (int) $id . '" data-price="' . esc_attr($price) . '"' . ($in_stock ? ' checked' : ' disabled') . '>';
+                // A lone optional product is only in the box if the customer ticks it.
+                $input = '<input type="checkbox" class="uk-checkbox" name="ggb[' . (int) $s . '][]" value="' . (int) $id . '" data-price="' . esc_attr($price) . '"' . ($in_stock ? '' : ' disabled') . '>';
             }
             $tag = $mode === 'fixed' ? 'div' : 'label';
             echo '<' . $tag . ' class="ggb-option' . ($in_stock ? '' : ' is-out') . '">'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
